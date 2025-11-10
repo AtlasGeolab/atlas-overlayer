@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Atlas Geolab — Overlayer</title>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Atlas Geolab — Overlayer</h1>
+    <p>Mix layers. Adjust opacity. Ship maps fast.</p>
+  </header>
+
+  <section class="controls">
+    <div class="control">
+      <label>Base map</label>
+      <select id="basemap">
+        <option value="osm">OpenStreetMap</option>
+        <option value="esri">Esri World Imagery (satellite)</option>
+      </select>
+    </div>
+
+    <div class="control">
+      <label>Add overlay (GeoJSON or CSV points)</label>
+      <input type="file" id="fileInput" accept=".geojson,.json,.csv" />
+    </div>
+
+    <div class="control">
+      <label>Add tiles / raster by URL (optional)</label>
+      <input id="rasterUrl" placeholder="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png or WMS GetMap URL" />
+      <button id="addRasterBtn">Add layer</button>
+    </div>
+
+    <div class="control">
+      <label>Overlay opacity</label>
+      <input type="range" id="opacity" min="0" max="1" step="0.05" value="0.8" />
+    </div>
+  </section>
+
+  <div id="map"></div>
+
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+  <script src="https://unpkg.com/esri-leaflet@3.0.11/dist/esri-leaflet.js"></script>
+  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
+:root { --bg:#0b0c10; --panel:#121318; --fg:#eaeef3; --muted:#9aa4af; }
+* { box-sizing: border-box; }
+body { margin:0; font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial; color:var(--fg); background:var(--bg); }
+header { padding:16px 20px; border-bottom:1px solid #222; }
+h1 { margin:0 0 6px 0; font-size:20px; }
+p { margin:0; color:var(--muted); }
+.controls { display:flex; gap:12px; flex-wrap:wrap; padding:12px 20px; background:var(--panel); border-bottom:1px solid #222; }
+.control { display:flex; gap:8px; align-items:center; }
+label { color:var(--muted); font-size:14px; }
+input[type="file"], input[type="text"], input[type="range"], select, input#rasterUrl {
+  background:#1a1c22; color:var(--fg); border:1px solid #2a2d36; border-radius:8px; padding:8px;
+}
+button { background:#2c6bed; border:0; color:white; padding:8px 12px; border-radius:8px; cursor:pointer; }
+button:hover { opacity:.9; }
+#map { height: calc(100vh - 148px); width: 100%; }
+.leaflet-container { background:#0b0c10; }
+// Basic map
+const map = L.map('map', { zoomControl: true }).setView([20, 0], 2);
+
+// Base layers
+const basemaps = {
+  osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '&copy; OpenStreetMap'
+  }),
+  esri: L.esri.basemapLayer('Imagery')
+};
+let currentBase = basemaps.osm.addTo(map);
+
+document.getElementById('basemap').addEventListener('change', (e) => {
+  map.removeLayer(currentBase);
+  currentBase = basemaps[e.target.value];
+  currentBase.addTo(map);
+});
+
+// Overlay group & state
+const overlayGroup = L.layerGroup().addTo(map);
+let overlayOpacity = 0.8;
+
+const setOpacity = (opacity) => {
+  overlayOpacity = Number(opacity);
+  overlayGroup.eachLayer(l => {
+    if (l.setOpacity) l.setOpacity(overlayOpacity);
+    if (l.setStyle) l.setStyle({ fillOpacity: overlayOpacity, opacity: overlayOpacity });
+  });
+};
+
+document.getElementById('opacity').addEventListener('input', e => setOpacity(e.target.value));
+
+// File upload (GeoJSON or CSV)
+document.getElementById('fileInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const text = await file.text();
+
+  if (file.name.endsWith('.csv')) {
+    const parsed = Papa.parse(text, { header: true, dynamicTyping: true });
+    // Expect columns lat, lon (or latitude, longitude)
+    const latKey = ['lat','latitude','y','Lat'].find(k => k in parsed.data[0]) || 'lat';
+    const lonKey = ['lon','lng','longitude','x','Lon','Lng'].find(k => k in parsed.data[0]) || 'lon';
+
+    const geojson = {
+      type: 'FeatureCollection',
+      features: parsed.data.filter(Boolean).map(row => ({
+        type: 'Feature',
+        properties: row,
+        geometry: {
+          type: 'Point',
+          coordinates: [Number(row[lonKey]), Number(row[latKey])]
+        }
+      }))
+    };
+    addGeoJSON(geojson);
+  } else {
+    const geojson = JSON.parse(text);
+    addGeoJSON(geojson);
+  }
+});
+
+function addGeoJSON(geojson) {
+  const layer = L.geoJSON(geojson, {
+    pointToLayer: (f, latlng) => L.circleMarker(latlng, {
+      radius: 5, color: '#4fc3f7', weight: 1, fillColor: '#4fc3f7', fillOpacity: overlayOpacity
+    }),
+    style: () => ({ color: '#ffe08a', weight: 2, fillOpacity: overlayOpacity, opacity: overlayOpacity }),
+    onEachFeature: (feature, layer) => {
+      const props = feature.properties || {};
+      const html = `<pre style="margin:0; font-size:12px">${escapeHtml(JSON.stringify(props, null, 2))}</pre>`;
+      layer.bindPopup(html);
+    }
+  });
+  overlayGroup.addLayer(layer);
+  try { map.fitBounds(layer.getBounds(), { maxZoom: 12 }); } catch {}
+}
+
+function escapeHtml(s){ return s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+// Optional: add raster/tiles by URL
+document.getElementById('addRasterBtn').addEventListener('click', () => {
+  const url = document.getElementById('rasterUrl').value.trim();
+  if (!url) return;
+
+  // Heuristic: treat as WMS if it contains "SERVICE=WMS"
+  if (/service=wms/i.test(url)) {
+    const wms = L.tileLayer.wms(url, { format: 'image/png', transparent: true, opacity: overlayOpacity });
+    overlayGroup.addLayer(wms);
+  } else {
+    const tiles = L.tileLayer(url, { opacity: overlayOpacity, maxZoom: 22 });
+    overlayGroup.addLayer(tiles);
+  }
+});
