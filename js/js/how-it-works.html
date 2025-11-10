@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>How it works — Atlas Geolab</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="nav-slot"></div>
+
+  <main class="container pad">
+    <h1>How it works</h1>
+    <div class="grid two">
+      <section class="card">
+        <h2>1) Gather</h2>
+        <p>We collect public and private geospatial data: satellite imagery (optical & SAR), drone data, survey data, and open layers (boundaries, terrain, hydrology, demographics).</p>
+      </section>
+      <section class="card">
+        <h2>2) Compose</h2>
+        <p>We overlay layers to answer specific questions, using lightweight web maps or notebooks. Wherever helpful, we use GeoAI (segmentation, change detection, object counting).</p>
+      </section>
+      <section class="card">
+        <h2>3) Validate</h2>
+        <p>We verify with ground truth where available and quantify uncertainty. Results are reproducible and delivered as dashboards, data products, or reports.</p>
+      </section>
+      <section class="card">
+        <h2>4) Ship</h2>
+        <p>We package a simple tool, a repeatable pipeline, or a one-off analysis—whatever best fits the use-case and budget.</p>
+      </section>
+    </div>
+
+    <h2>Example questions we solve</h2>
+    <ul class="checklist">
+      <li>Which facilities are in flood-risk buffers?</li>
+      <li>Where did shoreline or forest cover change since last year?</li>
+      <li>Which ships follow certain corridors, and how has that changed?</li>
+      <li>Where are the best candidate areas for wind or solar (constraints + yield)?</li>
+    </ul>
+  </main>
+
+  <div id="footer-slot"></div>
+  <script src="js/common.js"></script>
+  <script>mountNav("how"); mountFooter();</script>
+</body>
+</html>
